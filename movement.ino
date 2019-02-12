@@ -1,17 +1,22 @@
 // defines pins numbers
-const int LEFT_FWD      = 10;
-const int LEFT_BWD      = 11;
-const int LEFT_PWM      = 5;
-const int RIGHT_FWD     = 12;
-const int RIGHT_BWD     = 13;
-const int RIGHT_PWM     = 6;
+const int RIGHT_FWD    = 10;
+const int RIGHT_BWD    = 11;
+const int RIGHT_PWM    = 5;
+const int LEFT_FWD     = 13;
+const int LEFT_BWD     = 12;
+const int LEFT_PWM     = 6;
+
 const int SENSOR_LEFT   = 7;
 const int SENSOR_RIGHT  = 8;
+const int SENSOR_FRONT  = 4;
+const int LEFT_SPEED    = 100;
+const int RIGHT_SPEED   = .95*LEFT_SPEED;
 
-const int LEFT_SPEED    = 130;
-const int RIGHT_SPEED   = 130;
+const int SLOW_DIST     = 100;
+const int OBS_DIST      = 20;
 
-const int OBS_DIST      = 10;
+// Get this to half
+
 void setup() {
   // initialize serial communication:
   pinMode(LEFT_FWD, OUTPUT);
@@ -21,42 +26,19 @@ void setup() {
   pinMode(RIGHT_BWD, OUTPUT);
   pinMode(RIGHT_PWM, OUTPUT);
   Serial.begin(9600);
+  speed_count = 0;
 }
 
 void loop() {
   // establish variables for duration of the ping, and the distance result
   // in inches and centimeters:
   long duration1, duration2, cm1, cm2;
-
-
-  /***************************************************************************
-   * SENSOR CODE
-   ***************************************************************************/
-  // The same pin is used to read the signal from the PING))): a HIGH pulse
-  // whose duration is the time (in microseconds) from the sending of the ping
-  // to the reception of its echo off of an object.
-
-  cm1 = ping(SENSOR_LEFT);
-  cm2 = ping(SENSOR_RIGHT);
-
-  Serial.print(cm1);
-  Serial.print(" cm, ");
-  Serial.print(cm2);
-  Serial.print(" cm");
-  
-  Serial.println();
-
-  delay(100);
-
   
   /***************************************************************************
    * MOTOR CODE
    ***************************************************************************/
-   move_fwd(130,130);
-   delay(400);
-   move_fwd(-130,-130);
-   delay(400);
-   move_fwd(0,0);
+  check_obstacles(speed_count);
+//  move_fwd(LEFT_SPEED,RIGHT_SPEED);
 }
 
 int ping(int p){
@@ -86,23 +68,61 @@ void move_fwd (int l_pwm, int r_pwm) {
   digitalWrite(RIGHT_BWD, (r_pwm < 0));
 }
 
-void check_obstacles () {
+void check_obstacles (long speed_count) {
   // The same pin is used to read the signal from the PING))): a HIGH pulse
   // whose duration is the time (in microseconds) from the sending of the ping
   // to the reception of its echo off of an object.
-  long duration1, duration2, l_dist, r_dist;
+  long duration1, duration2, l_dist, r_dist, f_dist, l_speed, r_speed;
+  static int speed_count = 0;
 
+  // Check each sensor
   l_dist = ping(SENSOR_LEFT);
   r_dist = ping(SENSOR_RIGHT);
+  f_dist = ping(SENSOR_FRONT);
 
+  // Print each measurement
+  Serial.print("Left: ");
   Serial.print(l_dist);
-  Serial.print(" cm, ");
+  Serial.print(" cm, Front: ");
+  Serial.print(f_dist);
+  Serial.print(" cm, Right: ");
   Serial.print(r_dist);
   Serial.print(" cm");
   Serial.println();
 
-  move_fwd(LEFT_SPEED*(1-2*(l_dist <= OBS_DIST)),
-      RIGHT_SPEED*(1-2*(r_dist <= OBS_DIST)));
-  delay(100);
+  if (f_dist < SLOW_DIST) {
+    if (speed_count < 5) {
+      speed_count = speed_count + 1;
+    }  
+
+  }
+  else {
+    if (speed_count > 0) {
+      speed_count = speed_count - 1;
+    }
+  }
+  Serial.println(speed_count);
+  l_speed = LEFT_SPEED - speed_count * 10;
+  r_speed = RIGHT_SPEED - speed_count * 10;
+  // If any obstacle is noticed, turn clockwise until the obstacle is gone
+  if (f_dist <= OBS_DIST) {
+//    move_fwd(-1*LEFT_SPEED, -1*RIGHT_SPEED);
+//    delay(200);
+    move_fwd(LEFT_SPEED, -1*RIGHT_SPEED);
+    delay(20);
+  }
+  else if (l_dist <= OBS_DIST || r_dist <= OBS_DIST) {
+    move_fwd(LEFT_SPEED,-1*RIGHT_SPEED);
+    delay(20);
+  }
+  // Otherwise, move forward
+  else {
+    move_fwd(l_speed,r_speed);
+    delay(20);
+  }
+  
+//  move_fwd(LEFT_SPEED*(1-2*(l_dist <= OBS_DIST)),
+//      RIGHT_SPEED*(1-2*(r_dist <= OBS_DIST)));
+  delay(10);
 
 }
