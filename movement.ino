@@ -26,7 +26,6 @@ void setup() {
   pinMode(RIGHT_BWD, OUTPUT);
   pinMode(RIGHT_PWM, OUTPUT);
   Serial.begin(9600);
-  speed_count = 0;
 }
 
 void loop() {
@@ -37,7 +36,7 @@ void loop() {
   /***************************************************************************
    * MOTOR CODE
    ***************************************************************************/
-  check_obstacles(speed_count);
+  check_obstacles();
 //  move_fwd(LEFT_SPEED,RIGHT_SPEED);
 }
 
@@ -68,7 +67,7 @@ void move_fwd (int l_pwm, int r_pwm) {
   digitalWrite(RIGHT_BWD, (r_pwm < 0));
 }
 
-void check_obstacles (long speed_count) {
+void check_obstacles () {
   // The same pin is used to read the signal from the PING))): a HIGH pulse
   // whose duration is the time (in microseconds) from the sending of the ping
   // to the reception of its echo off of an object.
