@@ -1,28 +1,23 @@
 // defines pins numbers
-const int RIGHT_FWD    = 10;
-const int RIGHT_BWD    = 11;
+const int RIGHT_FWD    = 13;
+const int RIGHT_BWD    = 12;
 const int RIGHT_PWM    = 5;
-const int LEFT_FWD     = 13;
-const int LEFT_BWD     = 12;
+const int LEFT_FWD     = 10;
+const int LEFT_BWD     = 11;
 const int LEFT_PWM     = 6;
 
 const int SENSOR_LEFT   = 7;
 const int SENSOR_RIGHT  = 8;
 const int SENSOR_FRONT  = 4;
 const int LEFT_SPEED    = 100;
-const int RIGHT_SPEED   = .9*LEFT_SPEED;
-
-const int LEFT_TURN_SPEED = LEFT_SPEED*.5;
-const int RIGHT_TURN_SPEED = RIGHT_SPEED*.5;
+const int RIGHT_SPEED   = .95*LEFT_SPEED;
 
 const int SLOW_DIST     = 100;
-const int OBS_DIST      = 20;
+const int OBS_DIST      = 30;
+const int SIDE_DIST     = 20;
 
-const int slowDownTime=15; //number of steps to ramp down to minSlowSpeed
-const int minSlowSpeed = 50; //slowest forward speed when encountering obstacles, 0-255
-const int minTurnSpeed = .25; //slowest turn speed when encountering obstacles, 0-1
-
-// Get this to half
+const int SLOW_TIME     = 15;
+const int MIN_SPEED     = 50;
 
 void setup() {
   // initialize serial communication:
@@ -33,20 +28,16 @@ void setup() {
   pinMode(RIGHT_BWD, OUTPUT);
   pinMode(RIGHT_PWM, OUTPUT);
   Serial.begin(9600);
-  }
-
-void loop() {
-  // establish variables for duration of the ping, and the distance result
-  // in inches and centimeters:
-  long duration1, duration2, cm1, cm2;
-  
-  /***************************************************************************
-   * MOTOR CODE
-   ***************************************************************************/
-  check_obstacles();
-//  move_fwd(LEFT_SPEED,RIGHT_SPEED);
 }
 
+void loop() {
+  check_obstacles();
+}
+
+
+/**************************************************************************************
+* Function for running the 3-pin ping sensors
+**************************************************************************************/
 int ping(int p){
   // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
   // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
@@ -62,77 +53,135 @@ int ping(int p){
   return pulseIn(p, HIGH)*.034/2;
 }
 
+/**************************************************************************************
+* Functions for controlling the motors
+**************************************************************************************/
+// Tell Twitch to turn to the right at a given speed
+void turn_right(int l_pwm, int r_pwm) {
+  move_fwd(l_pwm,-1 * r_pwm);
+}
+
+// Tell Twitch to turn to the left at a given speed
+void turn_left(int l_pwm, int r_pwm) {
+  move_fwd(-1*l_pwm,r_pwm);
+}
+
+// Tell Twitch to move the motors at a specific speed and direction
 void move_fwd (int l_pwm, int r_pwm) {
   //Write the speed to the motors
   analogWrite(LEFT_PWM, abs(l_pwm));
   analogWrite(RIGHT_PWM,abs(r_pwm));
 
   // Determine the direction the motors should go
+  // If the given speed was positive, move forward
   digitalWrite(LEFT_FWD,  (l_pwm >= 0));
   digitalWrite(RIGHT_FWD, (r_pwm >= 0));
+  // If the given speed was negative, move backwards
   digitalWrite(LEFT_BWD,  (l_pwm < 0));
   digitalWrite(RIGHT_BWD, (r_pwm < 0));
 }
 
-void check_obstacles () {
-  // The same pin is used to read the signal from the PING))): a HIGH pulse
-  // whose duration is the time (in microseconds) from the sending of the ping
-  // to the reception of its echo off of an object.
-  long duration1, duration2, l_dist, r_dist, f_dist, l_speed, r_speed;
-  static int speed_count = 0;
 
+/**************************************************************************************
+* Function for determining movement
+**************************************************************************************/
+void check_obstacles () {
+  // Variables for distance from obstacles
+  long l_dist, r_dist, f_dist;
+  bool F_OBS, R_OBS, L_OBS;
+
+  // Variables for speed of motors
+  long l_speed, r_speed;
+  static int speed_count = 0;
+  // Variables to track how many times we've turned or moved forward
+  static int left_turns=0, right_turns=0,forward_moves=0;
+  
   // Check each sensor
   l_dist = ping(SENSOR_LEFT);
-  r_dist = ping(SENSOR_RIGHT);
   f_dist = ping(SENSOR_FRONT);
+  r_dist = ping(SENSOR_RIGHT);
 
-  // Print each measurement
-  Serial.print("Left: ");
-  Serial.print(l_dist);
-  Serial.print(" cm, Front: ");
-  Serial.print(f_dist);
-  Serial.print(" cm, Right: ");
-  Serial.print(r_dist);
-  Serial.print(" cm");
-  Serial.println();
+  // Check if we're in "danger zone" on any sensor
+  F_OBS = f_dist < OBS_DIST;
+  L_OBS = l_dist < SIDE_DIST;
+  R_OBS = r_dist < SIDE_DIST;
 
+  // Check if we should start slowing down
   if (f_dist < SLOW_DIST) {
-    if (speed_count < slowDownTime) {
+    if (speed_count < SLOW_TIME) {
+      // If we are coming up on an obstacle and not at min speed, slow down
       speed_count = speed_count + 1;
     }  
-
   }
   else {
     if (speed_count > 0) {
+      // Otherwise, start speeding back up to max speed
       speed_count = speed_count - 1;
     }
   }
-  Serial.println(speed_count);
-  l_speed = LEFT_SPEED - speed_count * (LEFT_SPEED-minSlowSpeed)/slowDownTime;
-  r_speed = RIGHT_SPEED - speed_count * (RIGHT_SPEED-minSlowSpeed)/slowDownTime;
-  // If any obstacle is noticed, turn left until the obstacle is gone
-  if (l_dist <= OBS_DIST) {
-    move_fwd(-1*l_speed,r_speed);
-    delay(20);
+
+  // Set the speeds based on speed count
+  l_speed = LEFT_SPEED  - speed_count * (LEFT_SPEED-MIN_SPEED)/SLOW_TIME;
+  r_speed = RIGHT_SPEED - speed_count *(RIGHT_SPEED-MIN_SPEED)/SLOW_TIME;
+  
+  // Obstacle seen on JUST the right sensor, so we turn left
+  if (R_OBS & !(L_OBS | F_OBS)) {
+    turn_left(l_speed,r_speed);
+    // Track how many times we've turned left
+    left_turns = left_turns + 1;
+    // Reset number of times we've moved forward
+    forward_moves = 0;
+    delay(40);
   }
-  else if (r_dist <= OBS_DIST) {
-    move_fwd(-1*l_speed,r_speed);
-    delay(20);
+  // Obstacle seen on JUST the left sensor, so we turn right
+  else if (L_OBS & !(R_OBS | F_OBS)) {
+    turn_right(l_speed,r_speed);
+    // Track how many times we've turned right
+    right_turns = right_turns + 1;
+    // Reset number of times we've moved forward
+    forward_moves = 0;
+    delay(40);
   }
-    else if (f_dist <= OBS_DIST) {
-   //move_fwd(-1*l_speed,-1*r_speed);
-   // delay(150);
-    move_fwd(-.5*l_speed,r_speed);
-    delay(20);
+  // Obstacle seen on JUST the front sensor, so we turn left
+  else if (F & !(R | L)) {
+    turn_left(l_speed,r_speed);
+    // Track how many times we've turned left
+    left_turns = left_turns + 1;
+    // Reset number of times we've moved forward
+    forward_moves = 0;
+    delay(60);
   }
-  // Otherwise, move forward
+  // If an obstacle is detected on MORE than one sensor, turn right
+  else if (L | F | R) {
+    turn_right(l_speed,r_speed);
+    // Track how many times we've turned right
+    right_turns = right_turns + 1;
+    // Reset number of times we've move forward
+    forward_moves = 0;
+    delay(40);
+  }
+  // No obstacles detected, move forward
   else {
     move_fwd(l_speed,r_speed);
+    // Keep track of how many times we've moved forward
+    forward_moves = forward_moves + 1;
     delay(20);
   }
-  
-//  move_fwd(LEFT_SPEED*(1-2*(l_dist <= OBS_DIST)),
-//      RIGHT_SPEED*(1-2*(r_dist <= OBS_DIST)));
-  delay(10);
 
+  // We've moved forward more than ten times, decide we aren't stuck
+  if (forward_moves > 10) {
+    // Reset all the state variables
+    forward_moves = 0;
+    left_turns = 0;
+    right_turns = 0;
+  }
+  // We've been turning left and right repeatedly, we're probably stuck
+  if (left_turns > 5 & right_turns > 5) {
+    // Turn right for a long time
+    turn_right(l_speed,r_speed);
+    // Completely reset the variables
+    left_turns = 0;
+    right_turns = 0;
+    delay(1000);
+  }
 }
