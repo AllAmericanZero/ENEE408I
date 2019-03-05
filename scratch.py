@@ -1,3 +1,6 @@
+#Multiscale (single angle) face detection for front and side faces, using Haar face detection which is CRAP please use a different algorithm
+
+
 import numpy as np
 import cv2
 import os
