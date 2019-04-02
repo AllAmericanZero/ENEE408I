@@ -1,5 +1,5 @@
 welcome: hello i am twitchy robot best robot on the 408 I lab. i dont do anything. what do you wamt to do?
 
-hi: hello. You have said hello to me {{number}} times.
+follow: i am following you now. please do not move.
 
-addthree: Those three numbers add up to {{number}}.
+stopfollow: i am no longer following you. There is nothing to worry about.
