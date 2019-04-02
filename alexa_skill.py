@@ -20,18 +20,16 @@ def startup():
     return question(welcome_msg)
 
 
-@ask.intent("hi")
-def hi():
-    hinumber += 1
-    msg = render_template('hi', number=hinumber)
+@ask.intent("follow")
+def follow():
+    msg = render_template('hi')
     return statement(msg)
 
-
-@ask.intent("addthree", convert={'first': int, 'second': int, 'third': int})
-def answer(first, second, third):
-    result = first+second+third
-    msg = render_template('addthree',number = result)
+@ask.intent("stopfollow")
+def stopfollow():
+    msg = render_template('hi')
     return statement(msg)
+
 
 
 if __name__ == '__main__':
