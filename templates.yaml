@@ -1,0 +1,5 @@
+welcome: hello i am twitchy robot best robot on the 408 I lab. i dont do anything. what do you wamt to do?
+
+hi: hello. You have said hello to me {{number}} times.
+
+addthree: Those three numbers add up to {{number}}.
