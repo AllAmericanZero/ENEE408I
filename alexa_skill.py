@@ -22,12 +22,25 @@ def startup():
 
 @ask.intent("follow")
 def follow():
-    msg = render_template('hi')
+    msg = render_template('follow')
     return statement(msg)
+
 
 @ask.intent("stopfollow")
 def stopfollow():
-    msg = render_template('hi')
+    msg = render_template('stopfollow')
+    return statement(msg)
+
+
+@ask.intent("forward")
+def forward():
+    msg = render_template('forward')
+    return statement(msg)
+
+
+@ask.intent("backward")
+def backward():
+    msg = render_template('backward')
     return statement(msg)
 
 
