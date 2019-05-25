@@ -89,12 +89,14 @@ le = pickle.loads(open(args["le"], "rb").read())
 
 # initialize the video stream, then allow the camera sensor to warm up
 print("[INFO] starting video stream...")
-vs = VideoStream(src=1).start()
+vs = VideoStream(src=0).start()
 time.sleep(2.0)
 
 # start the FPS throughput estimator
 fps = FPS().start()
 pts = deque(maxlen=200)
+start_time = time.time()
+
 while True:
     [initBB, frame] = tracking_func.facial_rec("alex",vs,detector,args,embedder,recognizer,fps,le)
     # loop over frames from the video stream
@@ -106,21 +108,9 @@ while True:
     curr_state = 0;
     # Calculate the center of the face as the first point
     coords = (int(((2*initBB[0] + initBB[2])/2)),int((2*initBB[1] + initBB[3])/2))
+    start_pos = coords
     while master_found:
-#        if curr_state == 0:
-#            print("Please sit down!")
-#        elif curr_state == 1:
-#            print("Please stand up!")
-#        else:
-#            print("Complete!")
-#            break
 
-        try:
-            change_state = ((pts[-1][0] - pts[-5][0]) < 10) and ((pts[-1][1] - pts[-5][1]))
-        except:
-            change_state = 0
-        else:
-            curr_state = curr_state + change_state
         [master_found, coords,H,W,frame] = tracking_func.check_sitting(tracker,initBB,vs,fps,args)
         # loop over the info tuples and draw them on our frame
         coords = (int(coords[0]),int(coords[1]))
@@ -128,7 +118,6 @@ while True:
             coords = pts[-1]
         pts.appendleft(coords)
 
-        print(coords)
         # loop over the set of tracked points
         for i in range(1, len(pts)):
             # if either of the tracked points are None, ignore
@@ -141,14 +130,26 @@ while True:
             cv2.line(frame, pts[i - 1], pts[i], (0, 0, 255), thickness)
         cv2.imshow("Frame", frame)
         key = cv2.waitKey(1) & 0xFF
+        try:
+            change_state = (abs(pts[1][1] - pts[10][1]) < 1)
+        except:
+            change_state = 0
+        else:
+            print(pts[1][1])
+            if change_state == 1 and (pts[1][1]-start_pos[1]) < -50:
+                #We know that they have stood up!
+                end_time = time.time()
+                break
     #ser.write(struct.pack('>B',SER_STOP))
+    if (master_found):
+        break
     print("Lost Master! :(")
     tracker = OPENCV_OBJECT_TRACKERS[args["tracker"]]()
-    
+
+sit_stand = end_time-start_time
+print("It took you "+str(int(sit_stand))+" seconds to stand up!")
 # stop the timer and display FPS information
 fps.stop()
-print("[INFO] elasped time: {:.2f}".format(fps.elapsed()))
-print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
 
 # do a bit of cleanup
 cv2.destroyAllWindows()
